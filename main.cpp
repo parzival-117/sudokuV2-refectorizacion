@@ -11,7 +11,7 @@ using namespace std;
 
 enum tError { ninguno, opciones, valor, bloqueada, original, vacia, ocupada };
 
-int mostrar_sudoku(const tReglasSudoku &reglas, const tError error);
+void mostrar_sudoku(const tReglasSudoku &reglas, const tError error);
 void poner_valor(tReglasSudoku &reglas, tError &error);
 void quitar_valor(tReglasSudoku &reglas, tError &error);
 int posibles_valores(tReglasSudoku &reglas, tError &error);
@@ -21,234 +21,203 @@ void cargar_listaSudokus(ListaSudokus &sudokus_nuevos,
 
 void pausar();
 char mayus(char op);
-void guardar_partidas(const ListaSudokus &guardar_partidas);
+
+// Funciones main
+
+int menu(); // Muestra el menu del juego NUeva partida Continuar partida y A salir
+
+bool seleccionar_partida(char tipo, ListaSudokus &nuevos,
+                         ListaSudokus &guardados, tReglasSudoku &partida,
+                         int &indice);
+void ejecutar_partida(tReglasSudoku &partida, tError &error);
+
+void guardar_partidas(const ListaSudokus &partidas_guardadas);
+void serializar_sudoku(ofstream &archivo, const tReglasSudoku &reglas);
+void gestionar_final_partida(tReglasSudoku &partida, bool es_nueva, int indice,
+                             ListaSudokus &guardados);
 
 bool resolver_sudoku(tReglasSudoku &sudoku, int fila, int columna);
 
 int main() {
-
   tReglasSudoku reglas;
-
   ListaSudokus sudokus_nuevos;
   ListaSudokus partidas_guardadas;
 
+  // Inicialización
   cargar_listaSudokus(sudokus_nuevos, partidas_guardadas, reglas);
 
   tError error = ninguno;
-
   char op = ' ';
-  int aux = 0;
-  bool jugar = false;
 
-  cout << "Partida nueva (N), continuar partida (C) o abandonar la aplicacion "
-          "(A)?"
-       << endl;
-  cin >> op;
-  op = mayus(op);
-  if (op == 'A' || op == 'C' || op == 'N') {
+  // Bucle Principal de la Aplicación
+  do {
+    cout << "\nPartida nueva (N), continuar partida (C) o abandonar (A)? ";
+    cin >> op;
+    op = mayus(op);
 
-    while (op != 'A') {
+    if (op == 'N' || op == 'C') {
       tReglasSudoku partida;
-      aux = 0;
-      jugar = false;
-
-      bool partida_nueva = false;
       int indice = -1;
-      switch (op) {
-      case 'N':
-        cout << sudokus_nuevos;
-        cout << "Elige un sudoku: ";
-        cin >> aux;
+      bool partida_nueva = (op == 'N');
 
-        if (cin.fail()) {
-          cin.clear();
-          cin.ignore(10000, '\n');
-          aux = -1;
-        }
+      // Selección de la partida
+      bool listo_para_jugar = seleccionar_partida(
+          op, sudokus_nuevos, partidas_guardadas, partida, indice);
 
-        if (aux <= sudokus_nuevos.dame_num_elems() && aux >= 1) {
-          jugar = true;
-          partida_nueva = true;
-          partida = sudokus_nuevos.dame_sudoku(aux - 1);
-        } else {
-          // Asignamos el error de la enumeración
-          error = valor;
-          // Lo imprimimos directamente porque no vamos a entrar a
-          // mostrar_sudoku()
-          cout << BG_RED << "VALOR INCORRECTO: Ese sudoku no existe." << RESET
-               << endl;
-        }
+      if (listo_para_jugar) {
+        // Bucle de juego
+        ejecutar_partida(partida, error);
 
-        break;
-      case 'C':
-        if (partidas_guardadas.dame_num_elems() > 0) {
-          cout << partidas_guardadas;
-          cout << "Elige un sudoku: ";
-          cin >> aux;
-
-          if (cin.fail()) {
-            cin.clear();
-            cin.ignore(10000, '\n');
-            aux = -1;
-          }
-          if (aux <= partidas_guardadas.dame_num_elems() && aux >= 1) {
-            jugar = true;
-            partida_nueva = false;
-            indice = aux - 1;
-            partida = partidas_guardadas.dame_sudoku(indice);
-          } else {
-            // Asignamos el error de la enumeración
-            error = valor;
-            cout << BG_RED << "VALOR INCORRECTO: Esa partida no existe."
-                 << RESET << endl;
-          }
-        } else {
-          cout << "No hay partidas guardadas.\n";
-        }
-        break;
-      case 'A': {
-
-        break;
+        // Gestión post-partida (Guardar o Eliminar si terminó)
+        gestionar_final_partida(partida, partida_nueva, indice,
+                                partidas_guardadas);
       }
-      default:
-        break;
-      }
-      if (jugar) {
-
-        int opcion = mostrar_sudoku(partida, error);
-        while (opcion != 7) {
-          error = ninguno;
-          switch (opcion) {
-          case 1:
-            poner_valor(partida, error);
-            break;
-          case 2:
-            quitar_valor(partida, error);
-            break;
-          case 3:
-            partida.reset();
-            break;
-          case 4:
-            posibles_valores(partida, error);
-            pausar();
-            break;
-          case 5: // celdas con unico valor
-            partida.autocompletar();
-            break;
-          case 6: // Resolver el sudoku
-            resolver_sudoku(partida, 0, 0);
-            break;
-          default:
-            error = opciones;
-            break;
-          }
-          opcion = mostrar_sudoku(partida, error);
-        }
-        // GUARDADO
-        if (partida.terminado()) {
-          // Si venía de las partidas guardadas, hay que borrarlo porque ya se
-          // lo pasó
-          if (!partida_nueva) {
-            partidas_guardadas.eliminar(indice);
-          }
-          // Si era nuevo, no hacemos nada (simplemente no lo guardamos)
-        }
-        // El usuario lo deja a medias (Sale con el 7)
-        else {
-          if (partida_nueva) {
-            // Si era nuevo, simplemente lo añadimos a la lista de guardadas
-            partidas_guardadas.insertar(partida);
-            cout << "\n[Info] Partida nueva guardada en progreso.\n";
-          } else {
-            // Si ya era una partida guardada, la eliminamos y la volvemos a
-            // insertar (Se hace esto para que el insertar() la reordene
-            // automáticamente según su nueva dificultad)
-            partidas_guardadas.eliminar(indice);
-            partidas_guardadas.insertar(partida);
-            cout << "\n[Info] Partida guardada actualizada.\n";
-          }
-        }
-      }
-      cout << "Partida nueva (N), continuar partida (C) o abandonar la "
-              "aplicacion "
-              "(A)?"
-           << endl;
-      cin >> op;
-      op = mayus(op);
     }
-  }
-  // Si se elige salir, guardamos las partidas
-  ofstream archivo_salida("saves/lista_partidas.txt");
+  } while (op != 'A');
 
-  if (archivo_salida.is_open()) {
-    // 1. Escribimos el número total de partidas
-    int total_partidas = partidas_guardadas.dame_num_elems();
-    archivo_salida << total_partidas << endl;
-
-    for (int p = 0; p < total_partidas; p++) {
-      // Obtenemos el sudoku en su estado actual (con jugadas)
-      tReglasSudoku actual = partidas_guardadas.dame_sudoku(p);
-
-      // Hacemos una copia y la reseteamos para tener el tablero original
-      // base
-      tReglasSudoku original = actual;
-      original.reset();
-
-      int dim = actual.dame_dimension();
-
-      // Guardamos la dimensión y el tablero original
-      archivo_salida << dim << endl;
-      for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < dim; j++) {
-          archivo_salida << original.dame_celda(i, j) << " ";
-        }
-        archivo_salida << endl;
-      }
-
-      // Guardamos las posiciones ocupadas por el jugador (comparando
-      // ambos tableros)
-      for (int i = 0; i < dim; i++) {
-        for (int j = 0; j < dim; j++) {
-          int val_orig = original.dame_celda(i, j);
-          int val_act = actual.dame_celda(i, j);
-
-          // Si en el original era 0 (vacía) y ahora tiene un número, lo
-          // puso el jugador
-          if (val_orig == 0 && val_act != 0) {
-            archivo_salida << i << " " << j << " " << val_act << endl;
-          }
-        }
-      }
-
-      // 4. Escribimos el centinela de fin de posiciones
-      archivo_salida << "-1" << endl;
-    }
-
-    archivo_salida.close();
-    cout << "Partidas guardadas correctamente. ¡Hasta pronto!\n";
-  } else {
-    cout << "Error: No se pudo abrir lista_partidas.txt para guardar.\n";
-  }
+  // 3. Finalización y Guardado
+  guardar_partidas(partidas_guardadas);
+  cout << "¡Hasta pronto!" << endl;
 
   return 0;
 }
 
 char mayus(char op) {
   switch (op) {
-
-  case 'n':
-    op = 'N';
-    break;
-  case 'c':
-    op = 'C';
-    break;
-  case 'a':
-    op = 'A';
-    break;
-  default:
-    break;
+  case 'n': op = 'N'; break;
+  case 'c': op = 'C'; break;
+  case 'a': op = 'A'; break;
+  default: break;
   }
   return op;
+}
+
+int menu() {
+  int opcion = -1;
+
+  cout << "\n";
+  cout << YELLOW << "------------- MENU -------------" << RESET << "\n";
+  cout << "1. Poner valor\n";
+  cout << "2. Quitar valor\n";
+  cout << "3. Reset\n";
+  cout << "4. Posibles valores de una celda vacia\n";
+  cout << "5. Autocompletar celdas con valor unico\n";
+  cout << "6. Resolver el sudoku\n";
+  cout << "7. Salir\n";
+  cout << YELLOW << "--------------------------------" << RESET << "\n";
+  cout << "Opcion: ";
+
+  cin >> opcion;
+
+  // Por si se introducen letras, para que no se produzcan bucles infinitos
+  if (cin.fail()) {
+    cin.clear();
+    cin.ignore(10000, '\n');
+    opcion = -1; // Marcamos como opción inválida
+  }
+
+  return opcion;
+}
+
+bool seleccionar_partida(char tipo, ListaSudokus &nuevos,
+                         ListaSudokus &guardados, tReglasSudoku &partida,
+                         int &indice) {
+  bool exito = false;
+  int aux;
+
+  if (tipo == 'N') {
+    cout << nuevos;
+    cout << "Elige un sudoku: ";
+  } else {
+    if (guardados.dame_num_elems() == 0) {
+      cout << "No hay partidas guardadas." << endl;
+      return false;
+    }
+    cout << guardados;
+    cout << "Elige una partida: ";
+  }
+
+  cin >> aux;
+  if (cin.fail()) {
+    cin.clear();
+    cin.ignore(10000, '\n');
+    aux = -1;
+  }
+
+  ListaSudokus &lista_actual = (tipo == 'N') ? nuevos : guardados;
+
+  if (aux >= 1 && aux <= lista_actual.dame_num_elems()) {
+    indice = aux - 1;
+    partida = lista_actual.dame_sudoku(indice);
+    exito = true;
+  } else {
+    cout << BG_RED << "VALOR INCORRECTO: No existe esa seleccion." << RESET
+         << endl;
+  }
+
+  return exito;
+}
+
+void ejecutar_partida(tReglasSudoku &partida, tError &error) {
+  int opcion = 0;
+
+  // Mientras el usuario no quiera salir y el sudoku no esté terminado
+  while (opcion != 7 && !partida.terminado()) {
+
+    // Mostramos cómo está el tablero y si hubo errores antes
+    mostrar_sudoku(partida, error);
+
+    // Limpiamos el error para que no se repita en la siguiente vuelta
+    error = ninguno;
+
+    // Pedimos la opción al usuario
+    opcion = menu();
+
+    // Ejecutamos la acción
+    switch (opcion) {
+    case 1:
+      poner_valor(partida, error);
+      break;
+    case 2:
+      quitar_valor(partida, error);
+      break;
+    case 3:
+      partida.reset();
+      break;
+    case 4:
+      posibles_valores(partida, error);
+      pausar();
+      break;
+    case 5:
+      partida.autocompletar();
+      break;
+    case 6:
+      resolver_sudoku(partida, 0, 0);
+      break;
+    case 7:
+      break;
+    default:
+      error = opciones;
+      break; // Aquí se genera el error de opción inválida
+    }
+  }
+}
+
+void gestionar_final_partida(tReglasSudoku &partida, bool es_nueva, int indice,
+                             ListaSudokus &guardados) {
+  if (partida.terminado()) {
+    mostrar_sudoku(partida, ninguno);
+    if (!es_nueva) {
+      guardados.eliminar(indice);
+    }
+  } else {
+    // Si no terminó, la insertamos/actualizamos en guardados
+    if (!es_nueva) {
+      guardados.eliminar(indice);
+    }
+    guardados.insertar(partida);
+    cout << "\n[Info] Partida sincronizada en lista de guardadas.\n";
+  }
 }
 
 bool resolver_sudoku(tReglasSudoku &sudoku, int fila, int columna) {
@@ -348,43 +317,96 @@ void cargar_listaSudokus(ListaSudokus &sudokus_nuevos,
   }
 }
 
-int mostrar_sudoku(const tReglasSudoku &reglas, const tError error) {
+// Esta función gestiona el ARCHIVO
+void guardar_partidas(const ListaSudokus &partidas_guardadas) {
+    ofstream archivo_salida("saves/lista_partidas.txt");
+
+    if (archivo_salida.is_open()) {
+        int total = partidas_guardadas.dame_num_elems();
+        
+        // Escribimos el número total de partidas al principio
+        archivo_salida << total << endl;
+
+        for (int i = 0; i < total; i++) {
+            // Llamamos a la función especialista en escribir UN sudoku
+            serializar_sudoku(archivo_salida, partidas_guardadas.dame_sudoku(i));
+        }
+
+        archivo_salida.close();
+        cout << "[Sistema] Todas las partidas han sido exportadas." << endl;
+    } else {
+        cout << "[Error] No se pudo abrir saves/lista_partidas.txt" << endl;
+    }
+}
+
+// Esta función gestiona el FORMATO del Sudoku
+void serializar_sudoku(ofstream &archivo, const tReglasSudoku &reglas) {
+    // Obtenemos el tablero base (el original sin jugadas)
+    tReglasSudoku original = reglas;
+    original.reset();
+
+    int dim = reglas.dame_dimension();
+    
+    // Guardamos la dimensión y el tablero original
+    archivo << dim << endl;
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            archivo << original.dame_celda(i, j) << " ";
+        }
+        archivo << endl;
+    }
+
+    // Comparamos con el tablero actual para guardar las jugadas del usuario
+    for (int i = 0; i < dim; i++) {
+        for (int j = 0; j < dim; j++) {
+            int val_act = reglas.dame_celda(i, j);
+            int val_orig = original.dame_celda(i, j);
+
+            // Si el original era 0 y ahora hay algo, es una jugada
+            if (val_orig == 0 && val_act != 0) {
+                archivo << i << " " << j << " " << val_act << endl;
+            }
+        }
+    }
+
+    // 4. Centinela para indicar que no hay más jugadas en este Sudoku
+    archivo << "-1" << endl;
+}
+void mostrar_sudoku(const tReglasSudoku &reglas, const tError error) {
   const int LINEA_HORIZONTAL = 196;
   const int LINEA_VERTICAL = 179;
   const int CRUCE = 197;
   const int ANCHO_CELDA = 3;
 
-  int opcion = -1;
   int dim = reglas.dame_dimension();
   int dim_submatriz = (int)sqrt((double)dim);
-  if (dim_submatriz <= 0)
-    dim_submatriz = 1;
-  string error_texto;
+  if (dim_submatriz <= 0) dim_submatriz = 1;
 
-  cout << endl
-       << CYAN << "================ SUDOKU ================" << RESET << '\n';
+  cout << endl << CYAN << "================ SUDOKU ================" << RESET << '\n';
 
-  // Cabecera de columnas
   cout << "    ";
   for (int c = 0; c < dim; c++) {
     cout << setw(3) << c;
     if ((c + 1) % dim_submatriz == 0 && c != dim - 1)
       cout << "  ";
   }
-
   cout << '\n';
 
   for (int i = 0; i < dim; i++) {
+    // Número de fila
     cout << setw(3) << i << " ";
+    
     for (int j = 0; j < dim; j++) {
       int v = reglas.dame_celda(i, j);
-      if (v == 0)
+      
+      if (v == 0) {
         cout << setw(3) << '.';
-      else {
+      } else {
+        // Los números se imprimen en color para resaltar
         cout << CYAN << setw(3) << v << RESET;
       }
 
-      // Separador de subcuadros de tamano variable
+      // Separador vertical de submatrices
       if ((j + 1) % dim_submatriz == 0 && j != dim - 1)
         cout << " " << char(LINEA_VERTICAL);
     }
@@ -392,7 +414,6 @@ int mostrar_sudoku(const tReglasSudoku &reglas, const tError error) {
 
     if ((i + 1) % dim_submatriz == 0 && i != dim - 1) {
       cout << "    ";
-      cout << char(LINEA_HORIZONTAL);
       for (int j = 0; j < dim; j++) {
         for (int k = 0; k < ANCHO_CELDA; k++)
           cout << char(LINEA_HORIZONTAL);
@@ -407,66 +428,33 @@ int mostrar_sudoku(const tReglasSudoku &reglas, const tError error) {
   }
 
   if (!reglas.terminado()) {
-    cout << '\n';
-    cout << YELLOW << "------------- MENU -------------" << RESET << '\n';
-    cout << "1. Poner valor\n";
-    cout << "2. Quitar valor\n";
-    cout << "3. Reset\n";
-    cout << "4. Posibles valores de una celda vacia\n";
-    cout << "5. Autocompletar celdas con valor unico\n";
-    cout << "6. Resolver el sudoku\n";
-    cout << "7. Salir\n";
-    cout << YELLOW << "--------------------------------" << RESET << '\n';
-    switch (error) {
-    case opciones:
-      error_texto = "OPCION INCORRECTA";
-      break;
-    case valor:
-      error_texto = "VALOR INCORRECTO";
-      break;
-    case bloqueada:
-      error_texto = "CELDA BLOQUEADA!";
-      break;
-    case original:
-      error_texto = "CELDA ORIGINAL";
-      break;
-    case vacia:
-      error_texto = "CELDA VACIA";
-      break;
-    case ocupada:
-      error_texto = "CELDA OCUPADA";
-      break;
-    default:
-      error_texto = "";
-      break;
-    }
-    cout << BG_RED << error_texto << RESET << endl;
-    if (error == bloqueada) {
-      int f, c;
-      cout << "Celdas bloqueadas: ";
-      for (int i = 0; i < reglas.dame_num_celdas_bloqueadas(); i++) {
-        reglas.dame_celda_bloqueada(i, f, c);
-        cout << "(" << f << ", " << c << ")" << ", ";
+    if (error != ninguno) {
+      string error_texto;
+      switch (error) {
+        case opciones:  error_texto = "OPCION INCORRECTA"; break;
+        case valor:     error_texto = "VALOR INCORRECTO"; break;
+        case bloqueada:  error_texto = "CELDA BLOQUEADA!"; break;
+        case original:  error_texto = "CELDA ORIGINAL"; break;
+        case vacia:     error_texto = "CELDA VACIA"; break;
+        case ocupada:   error_texto = "CELDA OCUPADA"; break;
+        default:        error_texto = ""; break;
       }
-      cout << endl;
-      pausar();
-    }
-    cout << "Opcion: ";
+      cout << BG_RED << error_texto << RESET << endl;
 
-    cin >> opcion;
-
-    if (cin.fail()) {
-      cin.clear();
-      cin.ignore(10000, '\n');
-      opcion = -1;
+      if (error == bloqueada) {
+        int f, c;
+        cout << "Celdas bloqueadas: ";
+        for (int i = 0; i < reglas.dame_num_celdas_bloqueadas(); i++) {
+          reglas.dame_celda_bloqueada(i, f, c);
+          cout << "(" << f << ", " << c << ")" << ", ";
+        }
+        cout << endl;
+        pausar();
+      }
     }
   } else {
-    cout << HK_PINK_PASTEL
-         << "=========== SUDOKU TERMINADO ===========" << RESET << endl;
-    opcion = 7;
+    cout << HK_PINK_PASTEL << "=========== SUDOKU TERMINADO ===========" << RESET << endl;
   }
-
-  return opcion;
 }
 
 void poner_valor(tReglasSudoku &reglas, tError &error) {

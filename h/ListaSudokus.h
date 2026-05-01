@@ -20,8 +20,8 @@ public:
   // Operadores
   tReglasSudoku &operator[](int indice);
 
-  int dame_num_elems();
-  const tReglasSudoku &dame_sudoku(int i);
+  int dame_num_elems() const;
+  const tReglasSudoku &dame_sudoku(int i) const;
   void insertar(const tReglasSudoku &sudoku);
   void eliminar(int pos); // elimina el elemento de la posición pos
 

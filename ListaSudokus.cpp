@@ -50,9 +50,9 @@ void ListaSudokus::resize() {
   arraySudokus = nuevoArray;
 }
 
-int ListaSudokus::dame_num_elems() { return cont; }
+int ListaSudokus::dame_num_elems() const { return cont; }
 
-const tReglasSudoku &ListaSudokus::dame_sudoku(int i) {
+const tReglasSudoku &ListaSudokus::dame_sudoku(int i) const {
   return *arraySudokus[i];
 }
 
