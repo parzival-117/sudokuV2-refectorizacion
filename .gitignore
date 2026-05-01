@@ -1,0 +1,3 @@
+# Ignorar archivos compilados y ejecutables
+*.o
+reglas_sudoku
